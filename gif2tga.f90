@@ -7,7 +7,7 @@ program gif2tga
 
     integer width
     integer height
-    integer*1 palette(3, 0:255)
+    integer*1 palette(3, 0 : 255)
     integer*1, allocatable :: pixels(:)
 
     integer*1 block_bytes
@@ -17,14 +17,14 @@ program gif2tga
     integer code
 
     call get_command_argument(1, filename)
-    open (unit, file=filename, access="STREAM", action="READ", form="UNFORMATTED")
+    open (unit, file=filename, access="STREAM", action="READ", form="UNFORMATTED", convert="LITTLE_ENDIAN")
     call read_gif()
     close (unit)
 
     i = index(filename, ".", .true.) ! replace the filename extension
     if (i <= 0) i = len_trim(filename) + 1 ! or append
-    filename(i:) = ".tga"
-    open (unit, file=filename, access="STREAM", action="WRITE", form="UNFORMATTED")
+    filename(i :) = ".tga"
+    open (unit, file=filename, access="STREAM", action="WRITE", form="UNFORMATTED", convert="LITTLE_ENDIAN")
     call write_tga()
     close (unit)
 
@@ -69,7 +69,7 @@ contains
         character*6 signature
         integer*1 header(7)
         integer*1 b
-        integer*1 block_length
+        integer block_length
         integer i
         integer*2 image_descriptor(4)
         integer*1 literal_bits
@@ -95,9 +95,10 @@ contains
             if (b /= z'21') stop "Invalid block" ! Extension
             read (unit) b
             do
-                read (unit) block_length
-                if (block_length == 0) exit
-                do i=1, block_length
+                read (unit) b
+                if (b == 0) exit
+                block_length = iand(b, 255)
+                do i = 1, block_length
                     read (unit) b
                 end do
             end do
@@ -105,14 +106,14 @@ contains
 
         ! Read image descriptor
         read (unit) image_descriptor
-        width = image_descriptor(3)
-        height = image_descriptor(4)
+        width = iand(image_descriptor(3), 65535)
+        height = iand(image_descriptor(4), 65535)
         if (width == 0 .or. height == 0) stop "Zero size"
         read (unit) b
         if (btest(b, 6)) stop "Interlace not supported"
         call read_palette(b)
         read (unit) literal_bits
-        if (literal_bits == 0 .or. literal_bits > 8) stop "Invalid minimum code size"
+        if (literal_bits <= 0 .or. literal_bits > 8) stop "Invalid minimum code size"
 
         block_bytes = 0
         bit_buffer = 0
@@ -145,7 +146,9 @@ contains
                 source_offset = offsets(code)
                 source_end_offset = offsets(code + 1)
                 dest_end_offset = pixels_offset + (source_end_offset - source_offset)
-                pixels(pixels_offset:dest_end_offset - 1) = pixels(source_offset:source_end_offset - 1)
+                pixels(pixels_offset : dest_end_offset - 1) = pixels(source_offset : source_end_offset - 1)
+                ! the following assignment must be done separately,
+                ! because it's possible that the right-hand-side is the first byte assigned above
                 pixels(dest_end_offset) = pixels(source_end_offset)
                 pixels_offset = dest_end_offset + 1
             end if
@@ -153,9 +156,9 @@ contains
     end
 
     subroutine write_tga()
-        integer*1 header(18)
-        header = int( (/ 0, 1, 1, 0, 0, 0, 1, 24, 0, 0, 0, 0, &
-            width, ishft(width, -8), height, ishft(height, -8), 8, 32 /), 1)
-        write (unit) header, palette(3:1:-1, :), pixels ! palette in BGR order
+        integer*1, parameter :: header(12) = int( (/ 0, 1, 1, 0, 0, 0, 1, 24, 0, 0, 0, 0 /), 1)
+        integer*2 sizes(3)
+        sizes = int( (/ width, height, 8 + 32 * 256 /), 2)
+        write (unit) header, sizes, palette(3 : 1 : -1, :), pixels ! palette in BGR order
     end
 end
