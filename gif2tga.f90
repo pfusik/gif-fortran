@@ -167,6 +167,7 @@ contains
                 pixels_offset = pixels_offset + 1
             else
                 do source_offset = offsets(code), offsets(code + 1)
+                    if (pixels_offset >= pixels_length) stop "Too many pixels"
                     pixels(to_interlace_offset(pixels_offset)) = pixels(to_interlace_offset(source_offset))
                     pixels_offset = pixels_offset + 1
                 end do
