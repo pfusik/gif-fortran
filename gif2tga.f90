@@ -134,8 +134,8 @@ contains
             end if
             if (code == literal_codes + 1) stop "Unexpected EOI code"
             if (code >= codes) stop "Code out of range"
-            if (code <= max_codes) then
-                if (code < max_codes .and. iand(codes, codes - 1) == 0) code_bits = code_bits + 1
+            if (codes <= max_codes) then
+                if (codes < max_codes .and. iand(codes, codes - 1) == 0) code_bits = code_bits + 1
                 offsets(codes) = pixels_offset
                 codes = codes + 1
             end if
