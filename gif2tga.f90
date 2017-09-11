@@ -9,6 +9,7 @@ program gif2tga
     integer height
     integer*1 palette(3, 0 : 255)
     integer*1, allocatable :: pixels(:)
+    logical interlace
 
     integer*1 block_bytes
     integer bit_buffer
@@ -65,6 +66,30 @@ contains
         bit_buffer_bits = bit_buffer_bits - code_bits
     end
 
+    function to_interlace_offset(offset)
+        integer to_interlace_offset
+        integer, value :: offset
+        integer y
+        integer x
+
+        if (.not. interlace) then
+            to_interlace_offset = offset
+        else
+            y = offset / width
+            x = mod(offset, width)
+            if (y >= ishft(height + 1, -1)) then
+                y = ishft(y - ishft(height + 1, -1), 1) + 1 ! pass 4
+            else if (y >= ishft(height + 3, -2)) then
+                y = ishft(y - ishft(height + 3, -2), 2) + 2 ! pass 3
+            else if (y >= ishft(height + 7, -3)) then
+                y = ishft(y - ishft(height + 7, -3), 3) + 4 ! pass 2
+            else
+                y = ishft(y, 3) ! pass 1
+            end if
+            to_interlace_offset = y * width + x
+        end if
+    end
+
     subroutine read_gif()
         character*6 signature
         integer*1 header(7)
@@ -80,8 +105,6 @@ contains
         integer offsets(max_codes + 1)
         integer pixels_offset
         integer source_offset
-        integer source_end_offset
-        integer dest_end_offset
 
         ! Read file header
         read (unit) signature, header
@@ -110,7 +133,7 @@ contains
         height = iand(image_descriptor(4), 65535)
         if (width == 0 .or. height == 0) stop "Zero size"
         read (unit) b
-        if (btest(b, 6)) stop "Interlace not supported"
+        interlace = btest(b, 6)
         call read_palette(b)
         read (unit) literal_bits
         if (literal_bits <= 0 .or. literal_bits > 8) stop "Invalid minimum code size"
@@ -140,17 +163,13 @@ contains
                 codes = codes + 1
             end if
             if (code < literal_codes) then
-                pixels(pixels_offset) = int(code, 1)
+                pixels(to_interlace_offset(pixels_offset)) = int(code, 1)
                 pixels_offset = pixels_offset + 1
             else
-                source_offset = offsets(code)
-                source_end_offset = offsets(code + 1)
-                dest_end_offset = pixels_offset + (source_end_offset - source_offset)
-                pixels(pixels_offset : dest_end_offset - 1) = pixels(source_offset : source_end_offset - 1)
-                ! the following assignment must be done separately,
-                ! because it's possible that the right-hand-side is the first byte assigned above
-                pixels(dest_end_offset) = pixels(source_end_offset)
-                pixels_offset = dest_end_offset + 1
+                do source_offset = offsets(code), offsets(code + 1)
+                    pixels(to_interlace_offset(pixels_offset)) = pixels(to_interlace_offset(source_offset))
+                    pixels_offset = pixels_offset + 1
+                end do
             end if
         end do
     end
