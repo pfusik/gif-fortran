@@ -25,7 +25,7 @@ program gif2tga
     i = index(filename, ".", .true.) ! replace the filename extension
     if (i <= 0) i = len_trim(filename) + 1 ! or append
     filename(i :) = ".tga"
-    open (unit, file=filename, access="STREAM", action="WRITE", form="UNFORMATTED", convert="LITTLE_ENDIAN")
+    open (unit, file=filename, access="STREAM", action="WRITE", status="REPLACE", form="UNFORMATTED", convert="LITTLE_ENDIAN")
     call write_tga()
     close (unit)
 
