@@ -41,9 +41,7 @@ contains
         end if
     end
 
-    function read_block_byte()
-        integer*1 read_block_byte
-
+    integer*1 function read_block_byte()
         if (block_bytes == 0) then
             read (unit) block_bytes
             if (block_bytes == 0) stop "Unexpected block terminator"
@@ -66,8 +64,7 @@ contains
         bit_buffer_bits = bit_buffer_bits - code_bits
     end
 
-    function to_interlace_offset(offset)
-        integer to_interlace_offset
+    integer function to_interlace_offset(offset)
         integer, value :: offset
         integer y
         integer x
@@ -108,7 +105,7 @@ contains
 
         ! Read file header
         read (unit) signature, header
-        if (signature /= "GIF87a" .and. signature /= "GIF89a") STOP "Not a GIF"
+        if (signature /= "GIF87a" .and. signature /= "GIF89a") stop "Not a GIF"
         call read_palette(header(5))
 
         ! Skip extension blocks if any
